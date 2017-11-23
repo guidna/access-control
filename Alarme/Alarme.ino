@@ -21,8 +21,11 @@ boolean changePassActive = false;
 boolean newPassword = false;
 boolean confirmNewPassword = false;
 
-
 int action = 0;
+
+
+boolean getPassword = false;
+boolean alarmActive = false;
 
 String seqKeyWord = "";
 
@@ -43,10 +46,13 @@ void loop(){
     
     if(( action >= 1 ) && (action <= 3)) {
       changePass(action);
+      
     } else if (( action == 100 ) && (!newPassword)) {
       newPassword = validPassword(1);
+      
     } else if (( action == 100 ) && (newPassword) && (!confirmNewPassword))  {
       confirmNewPassword = validPassword(2);
+      
     } else if (( action == 100 ) && (newPassword) && (confirmNewPassword))  {
       confirmNewPassword = validPassword(3);
       
@@ -58,6 +64,19 @@ void loop(){
       changePassActive = false;
       newPassword = false;
       newPass = "";
+      
+    } else if (action == 200) {
+      getPassword = true;
+      
+    } else if (action == 300) {
+      if( changeAlarmStatus() ) {
+        if( alarmActive) {
+          Serial.println("Alarme ativado");
+        } else {
+          Serial.println("Alarme desativado");        
+        }
+      }
+      
     }
       
     if( action > 0) {
@@ -99,8 +118,12 @@ int ret = 0;
     seqKeyWord += keyPress;
   } else if ((changePassActive) && (keyPress = '*')) {
     ret = 100;
-  } 
-
+  } else if((seqKeyWord == "") && (keyPress == '*')) {
+    ret = 200;
+  } else if ((getPassword) && (keyPress = '#')) {
+    ret = 300;
+  }
+  
   return ret;
   
 }
@@ -163,5 +186,20 @@ boolean validPassword(int level) {
 void cleanVariable() {
   seqKeyWord = "";
   action = 0;
+}
+
+boolean changeAlarmStatus() {
+
+  boolean ret = false;
+  
+  if(passActive == seqKeyWord) {
+    alarmActive = !alarmActive;
+    ret = true;
+  } else {
+    Serial.println("Senha inválida");
+  }
+
+  return ret;
+  
 }
 
