@@ -17,12 +17,8 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 String passActive = "000000";
 String newPass;
 
-boolean changePassActive = false;
-boolean newPassword = false;
-boolean confirmNewPassword = false;
-
+int levelChangePass = 0;
 int action = 0;
-
 
 boolean getPassword = false;
 boolean alarmActive = false;
@@ -47,45 +43,22 @@ void loop(){
     if(( action >= 1 ) && (action <= 3)) {
       changePass(action);
       
-    } else if (( action == 100 ) && (!newPassword)) {
-      newPassword = validPassword(1);
-      
-    } else if (( action == 100 ) && (newPassword) && (!confirmNewPassword))  {
-      confirmNewPassword = validPassword(2);
-      
-    } else if (( action == 100 ) && (newPassword) && (confirmNewPassword))  {
-      confirmNewPassword = validPassword(3);
-      
-      if( confirmNewPassword ) {
-        passActive = newPass;
-      }
-      
-      confirmNewPassword = false;
-      changePassActive = false;
-      newPassword = false;
-      newPass = "";
+    } else if ( action == 100 ) {
+      levelCheckPass();
       
     } else if (action == 200) {
       getPassword = true;
       
     } else if (action == 300) {
-      if( changeAlarmStatus() ) {
-        if( alarmActive) {
-          Serial.println("Alarme ativado");
-        } else {
-          Serial.println("Alarme desativado");        
-        }
-      }
-      
+      changeAlarm();
+
     }
       
     if( action > 0) {
       cleanVariable();
-    }
-    
+    }  
     
   }
-
 
 }
 
@@ -116,13 +89,15 @@ int ret = 0;
     ret = 3;
   } else if ((keyPress != '#') && (keyPress != '*')) {
     seqKeyWord += keyPress;
-  } else if ((changePassActive) && (keyPress = '*')) {
+  } else if ((levelChangePass > 0) && (keyPress = '*')) {
     ret = 100;
   } else if((seqKeyWord == "") && (keyPress == '*')) {
     ret = 200;
   } else if ((getPassword) && (keyPress = '#')) {
     ret = 300;
   }
+
+  Serial.println(seqKeyWord);
   
   return ret;
   
@@ -130,7 +105,7 @@ int ret = 0;
 
 void changePass(int type) {
 
-    changePassActive = true;
+    levelChangePass = 1;
     
     switch ( type )
     {
@@ -147,16 +122,16 @@ void changePass(int type) {
      
 }
 
-boolean validPassword(int level) {
+int validPassword(int level) {
 
-    boolean ret = true;
+    int ret = 0;
 
     switch ( level )
     {
        case 1 :
-              ret = (passActive == seqKeyWord);
               if(passActive == seqKeyWord) {
                 Serial.println("Informe a nova senha");
+                ret = 2;
               } else {
                 Serial.println("Senha inválida");
                 Serial.println("Processo de troca abortado");    
@@ -166,12 +141,13 @@ boolean validPassword(int level) {
        case 2 : 
               newPass = seqKeyWord;
               Serial.println("Confirme a nova senha");
+              ret = 3;
               break;
               
        case 3 : 
-              ret = (newPass == seqKeyWord);
               if(newPass == seqKeyWord) {
                 Serial.println("Senha alterada");
+                ret = 4;
               } else {
                 Serial.println("Nova senha não confere");
                 Serial.println("Processo de troca abortado");   
@@ -203,3 +179,35 @@ boolean changeAlarmStatus() {
   
 }
 
+void levelCheckPass() {
+  
+  if (levelChangePass == 1) {
+    levelChangePass = validPassword(1);
+    
+  } else if (levelChangePass == 2)  {
+    levelChangePass = validPassword(2);
+      
+  } else if (levelChangePass == 3)  {
+    levelChangePass = validPassword(3);
+      
+    if( levelChangePass == 4 ) {
+      passActive = newPass;
+    }
+      
+    levelChangePass = 0;
+    newPass = "";
+  }
+
+}
+
+void changeAlarm() {
+
+  if( changeAlarmStatus() ) {
+    if( alarmActive) {
+      Serial.println("Alarme ativado");
+    } else {
+      Serial.println("Alarme desativado");        
+    }
+  }
+  
+}
