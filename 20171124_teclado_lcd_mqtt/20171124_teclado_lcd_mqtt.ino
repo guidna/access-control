@@ -18,9 +18,10 @@ long lastReconnectAttempt = 0;
 boolean reconnect() {
   Serial.println("conectando...");
   if (client.connect("arduinoClient", "casa01", "senha01")) {
-    Serial.println("conectado");
+    Serial.println("MQTT conectado");
     // Once connected, publish an announcement...
     client.publish("alarme","hello world");
+    Serial.println("MQTT enviado");
     // ... and resubscribe
     client.subscribe("alarme");
   }else{
