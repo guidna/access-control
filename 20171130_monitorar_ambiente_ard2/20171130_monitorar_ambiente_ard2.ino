@@ -6,20 +6,15 @@
 #include <PubSubClient.h>
 
 byte mac[] = {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, 0x02 };
+boolean alarmActivated;
+boolean messageSent;
 
-boolean callback(char* topic, byte* payload, unsigned int length) {
-  // Converter pointer do tipo `byte` para typo `char`
-  char* payloadAsChar = payload;
-  // Workaround para pequeno bug na biblioteca
-  payloadAsChar[length] = 0;
-  // Converter em tipo String para conveniência
-  String msg = String(payloadAsChar);
-  // https://www.arduino.cc/en/Reference/StringToInt
-  int statusMQTTAlarm = msg.toInt();
-
+void callback(char* topic, byte* payload, unsigned int length) {
+    // https://www.arduino.cc/en/Reference/StringToInt
+  byte statusMQTTAlarm = payload[0] - '0';
 
   Serial.print("Topic received: "); Serial.println(topic);
-  Serial.print("Message: "); Serial.println(msg);
+  Serial.print("Message: "); Serial.println(statusMQTTAlarm);
 
   // Dentro do callback da biblioteca MQTT,
   // devemos usar Serial.flush() para garantir que as mensagens serão enviadas
@@ -29,19 +24,13 @@ boolean callback(char* topic, byte* payload, unsigned int length) {
 
   Serial.flush();
 
-  return statusMQTTAlarm;
+  setAlarm(statusMQTTAlarm);
 }
 
 EthernetClient ethClient;
 PubSubClient client("m14.cloudmqtt.com", 19138, callback, ethClient);
 
 long lastReconnectAttempt = 0;
-
-boolean reconnect() {
-  Serial.print("...reconectando: ");
-  Serial.println(client.connected());
-  return client.connected();
-}
 
 /***********Ultrassom***********/
 
@@ -61,31 +50,13 @@ void setup() {
 
 /*LOOP******/
 void loop() {
-  Serial.println("Loop");
-
   timerMQTTconnect();
-  subscribeMQTTAlarm();
-
-
-  if (callback) {
-    boolean callback1 = callback;
-    boolean callback2 = callback();    
-    
-    Serial.print("Callback: ");
-    Serial.println(callback1);
-
-    Serial.print("Callback(): ");
-    Serial.println(callback2);
-    
-    turnLed(callback);
-    Serial.print("Turn Led ON/OFF: ");
-    Serial.println(callback2);
-    
-    if (ultrasoundActivate()) {
+  if(checkAlarm()) {
+    if(!messageSent){
       publishMQTTAlarm();
+      messageSent = true;
     }
   }
-
 }
 void serialSetup() {
   Serial.begin(9600);
@@ -94,10 +65,11 @@ void serialSetup() {
   Serial.println("Setup");
 }
 void ethernetSetup() {
-  Ethernet.begin(mac);
-  delay(1500);
-  lastReconnectAttempt = 0;
-  Serial.println("Ethernet Setup");
+  if(Ethernet.begin(mac)) {
+    Serial.println(Ethernet.localIP());
+  } else {
+    Serial.println("Não pegou IP");
+  }
 }
 void ledSetup() {
   pinMode(LedR, OUTPUT);
@@ -107,15 +79,17 @@ void ledSetup() {
 void timerMQTTconnect() {
   if (!client.connected()) {
     long now = millis();
+
     if (now - lastReconnectAttempt > 5000) {
+      Serial.print("...reconectando: ");
       lastReconnectAttempt = now;
       Serial.print("Conectando ao MQTT");
-      if (reconnect()) {
+      reconnect();
+      if (client.connected()) {
         lastReconnectAttempt = 0;
       }
     }
   } else {
-    Serial.print("Conectado ao MQTT");
     client.loop();
   }
 }
@@ -125,13 +99,20 @@ void turnLed(int state) {
   digitalWrite(LedG, state);
 }
 
-boolean ultrasoundActivate() {
+void setAlarm(boolean activated) {
+  alarmActivated = activated;
+}
 
+boolean checkAlarm() {
+  if(!alarmActivated) {
+    return false;
+  }
+  
   delay(100);//5000
 
   Serial.println("Alarme ativado!");
 
-  int invasao;
+  boolean invasao;
 
   int distancia = ultrasonic.distanceRead();
 
@@ -140,16 +121,16 @@ boolean ultrasoundActivate() {
 
   if (distancia < 30) {
     Serial.println("invasao 1");
-    invasao = 1;
+    invasao = true;
   } else {
     Serial.println("invasao 0");
-    invasao = 0;
+    invasao = false;
   }
 
   return invasao;
 
 }
-void subscribeMQTTAlarm() {
+void reconnect() {
   if (client.connect("arduinoClient", "casa01", "senha01")) {
     Serial.println("MQTT conectado");
     // ... and resubscribe
@@ -159,16 +140,10 @@ void subscribeMQTTAlarm() {
     Serial.println("Erro no subscribe");
   }
 }
-void publishMQTTAlarm() {
-  if (client.connect("arduinoClient", "casa01", "senha01")) {
-    Serial.println("Casa invadida!");
-    // Once connected, publish an announcement...
-    client.publish("invasao", "Casa invadida!");
-  } else {
-    Serial.println("Problema ao publicar mensagem 'Casa invadida'");
-  }
+boolean publishMQTTAlarm() {
+  return client.publish("invasao", "Casa invadida!");
 }
-void verifyStatusAlarm(){
+void verifyStatusAlarm() {
 
 }
 
